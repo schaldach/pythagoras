@@ -27,12 +27,30 @@ function Graph2D({ exp }: GraphProps) {
   useEffect(() => {
     const canvas = canvasRef.current;
     setCanvas(canvas);
-    if (!canvas) {return;}
+    if (!canvas) {
+      return;
+    }
     const ctx = canvas.getContext("2d");
     setCtx(ctx);
   }, []);
 
-  useEffect(() => {
+  const handleMouseMove = (event: any) => {
+    const localX = event.clientX - event.target.offsetLeft;
+    const localY = event.clientY - event.target.offsetTop;
+
+    if (localX > 0 && localX <= 500 && localY > 0 && localY <= 500) {
+      drawGraph(true, localX - 250);
+    }
+  };
+
+  function eraseLine() {
+    if (!canvasCtx || !canvas) {
+      return;
+    }
+    drawGraph();
+  }
+
+  function drawGraph(hoverMode: boolean = false, localX: number = 0) {
     if (!canvasCtx || !canvas) {
       return;
     }
@@ -40,6 +58,7 @@ function Graph2D({ exp }: GraphProps) {
     canvasCtx.translate(canvas.width / 2, canvas.height / 2);
     canvasCtx.strokeStyle = "#000000";
     canvasCtx.lineWidth = 1;
+    canvasCtx.setLineDash([]);
 
     canvasCtx.beginPath();
     canvasCtx.moveTo(0, canvas.height / 2);
@@ -52,29 +71,64 @@ function Graph2D({ exp }: GraphProps) {
     canvasCtx.stroke();
 
     canvasCtx.strokeStyle = "#4C98FA";
-    canvasCtx.lineWidth = 2;
-    canvasCtx.beginPath();
+    canvasCtx.lineWidth = 4;
+    const resultsArray = [];
     for (let i = 0; i < canvas.width; i++) {
       const x: number = (i - canvas.width / 2) * defaultZoom;
       const y: number | undefined = validateExpression(exp, x);
       if (y === undefined) {
         continue;
       }
-
-      const canvasX = x / defaultZoom;
+      resultsArray.push(y);
+      const canvasX = Math.round(x / defaultZoom);
       const canvasY = -y / defaultZoom;
-      if (i === 0) {
+      if (hoverMode && canvasX === localX) {
+        canvasCtx.stroke();
+        canvasCtx.beginPath();
+        canvasCtx.arc(canvasX, canvasY, 6, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = "#4C98FA";
+        canvasCtx.fill();
+        canvasCtx.beginPath();
+      }
+      if (
+        i === 0 ||
+        Math.abs(y - resultsArray[i - 1]) >
+          canvas.width * defaultZoom /*CanvasHeight*/
+      ) {
+        if (i !== 0) canvasCtx.stroke();
+        canvasCtx.beginPath();
         canvasCtx.moveTo(canvasX, canvasY);
       } else {
         canvasCtx.lineTo(canvasX, canvasY);
       }
     }
     canvasCtx.stroke();
-    canvasCtx.translate(-canvas.width / 2, -canvas.height / 2);
 
+    if (hoverMode) {
+      canvasCtx.strokeStyle = "#4C98FA";
+      canvasCtx.lineWidth = 2;
+      canvasCtx.setLineDash([15, 15]);
+      canvasCtx.moveTo(localX, -250);
+      canvasCtx.lineTo(localX, 250);
+      canvasCtx.stroke();
+    }
+
+    canvasCtx.translate(-canvas.width / 2, -canvas.height / 2);
+  }
+
+  useEffect(() => {
+    drawGraph();
   }, [exp]);
 
-  return <canvas width={500} height={500} ref={canvasRef} />;
+  return (
+    <canvas
+      onMouseLeave={eraseLine}
+      onMouseMove={handleMouseMove}
+      width={500}
+      height={500}
+      ref={canvasRef}
+    />
+  );
 }
 
 export default Graph2D;
